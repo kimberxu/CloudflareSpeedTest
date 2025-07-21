@@ -6,8 +6,7 @@ on:
   # 允许在 Actions 页面手动触发此工作流
   workflow_dispatch:
 
-  # 定时任务：使用 cron 语法
-  # 此处设置为每周一的 02:00 UTC 时间，约等于北京时间上午10点
+  # 定时任务：每周一的 02:00 UTC (北京时间上午10点)
   schedule:
     - cron: '0 2 * * 1'
 
@@ -24,12 +23,11 @@ jobs:
     # 步骤
     steps:
       # 第一步：检出（Checkout）你自己的仓库
+      # 这一步会自动使用 GITHUB_TOKEN 来进行认证
       - name: Checkout Fork
         uses: actions/checkout@v4
         with:
-          # persist-credentials: false 是为了下一步能使用 GITHUB_TOKEN
-          # fetch-depth: 0 是为了获取所有历史记录，以便进行合并
-          persist-credentials: false
+          # 获取所有历史记录，以便进行合并
           fetch-depth: 0
 
       # 第二步：执行同步脚本
@@ -39,22 +37,23 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
+          # 动态获取你仓库的默认分支名 (main 或 master)
+          LOCAL_BRANCH="${{ github.ref_name }}"
+          echo "Local default branch is ${LOCAL_BRANCH}"
+
           # 添加上游（upstream）仓库的远程地址
+          # 上游仓库是 XIU2/CloudflareSpeedTest
           git remote add upstream https://github.com/XIU2/CloudflareSpeedTest.git
           
           # 从上游仓库获取所有分支和标签
           git fetch upstream
           
-          echo "Current branch is $(git rev-parse --abbrev-ref HEAD)"
-          echo "Merging from upstream/master..."
+          echo "Merging from upstream/master into ${LOCAL_BRANCH}..."
 
-          # 切换到你的主分支（通常是 main 或 master）
-          # 如果你的主分支是 master，请将下面的 "main" 改为 "master"
-          git checkout master
-          
-          # 合并上游仓库的主分支到你的主分支
-          # 如果上游主分支是 master，请将 "upstream/main" 改为 "upstream/master"
+          # 将上游仓库的 master 分支合并到你的默认分支
+          # (经检查，上游仓库的主分支是 master)
           git merge upstream/master --no-edit
           
-          # 将合并后的代码推送到你自己的仓库（origin）
-          git push origin master
+          # 将合并后的代码（包括所有新标签）推送到你自己的仓库
+          echo "Pushing changes and tags to origin/${LOCAL_BRANCH}..."
+          git push origin "${LOCAL_BRANCH}" --follow-tags
